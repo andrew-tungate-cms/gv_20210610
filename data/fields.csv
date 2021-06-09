@@ -1,0 +1,10 @@
+Column Name,Description,Notes
+bene_id,Beneficiary ID,
+sasdt,Date (day of year),Format DATE9.
+sas_month,Month,First day of each month; format MONYY7.
+last_trgt,Date of the most recent MDS assessment,Format DATE9.
+entry_sasdt,Date of the most recent NH admission,Format DATE9.
+in_nh_today,Flag if beneficary was in NH on a specific day,
+episode_length30d,"Day number of NH ""episode"" allowing for <= 30 day gaps",Only days in NH count towards total
+days_since_discharge,Number of days since discharged,Blank if bene will return in <= 30 days
+deceased_yn,Whether or not a beneficary expired,"""Y"" on the expiration day; ""P"" for the following days"

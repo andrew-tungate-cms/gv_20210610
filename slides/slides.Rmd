@@ -1,0 +1,329 @@
+---
+title: "NH Daily File"
+subtitle: "Designating NH Residence using MDS Data - 2020"
+author: 
+  - "Andrew Tungate"
+date: 'June 10th, 2021'
+output:
+  xaringan::moon_reader:
+    css: xaringan-themer.css
+    nature:
+      slideNumberFormat: "%current%"
+      highlightStyle: github
+      highlightLines: true
+      ratio: 16:9
+      countIncrementalSlides: true
+---
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+knitr::opts_chunk$set(
+  fig.width=9, fig.height=3.5, fig.retina=3,
+  fig.showtext = TRUE,
+  out.width = "100%",
+  cache = FALSE,
+  echo = TRUE,
+  message = FALSE, 
+  warning = FALSE,
+  fig.show = TRUE,
+  hiline = TRUE
+)
+```
+
+```{r xaringan-themer, include=FALSE, warning=FALSE}
+library(xaringanthemer)
+style_mono_light(
+  base_color = "#23395b"
+  )
+xaringanExtra::use_tile_view()
+```
+
+```{r create_r_objects, include=FALSE, warning=FALSE}
+
+library(here)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+
+# Fields table
+fields = read.csv(here("data", "fields.csv"), check.names = FALSE)
+
+# Example records
+records = data.frame(bene_id = c(rep(24601, 27), rep(NA, 3), rep(24601, 10), rep(8675309, 10)),
+                     sasdt = c(seq(as.Date("2020-01-01"), as.Date("2020-01-27"), 1L),
+                               rep(NA, 3),
+                               seq(as.Date("2020-12-22"), as.Date("2020-12-31"), 1L),
+                               seq(as.Date("2020-01-01"), as.Date("2020-01-10"), 1L)),
+                     sas_month = NA,
+                     last_trgt = as.Date(c(rep("2019-10-15", 11), rep("2020-01-12", 16), rep(NA, 3),
+                                           rep("2020-09-06", 10), rep("2019-12-22", 10))),
+                     entry_sasdt = as.Date(c(rep("2019-03-15", 27), rep(NA, 3), 
+                                             rep("2020-06-09", 10), rep("2019-12-22", 6), rep(NA, 4))),
+                     in_nh_today = c(rep("Y", 27), rep(NA, 3), rep("Y", 17), rep("N", 3)),
+                     episode_length30d = c(seq(78, 104, 1), rep(NA, 3),
+                                           seq(431, 440, 1), 10:16, rep(0, 3)),
+                     days_since_discharge = c(rep(".", 27), rep(NA, 3), rep(".", 16), 0:3),
+                     deceased_yn = c(rep("N", 27), rep(NA, 3), rep("N", 16), "Y", rep("P", 3)))
+records$sas_month = toupper(format(records$sasdt, format = "%b%Y"))
+
+temp_cols = c("sasdt", "last_trgt", "entry_sasdt")
+records[temp_cols] = lapply(records[temp_cols], function(x) toupper(format(x, format = "%d%b%Y")))
+records[is.na(records)] = "..."
+records[47:50, "entry_sasdt"] = "."
+
+# Data for churn plot
+churn = read.csv(here("data", "churn.csv"))
+churn$sas_month = as.Date(paste0("01", churn$sas_month), format = "%d%b-%y")
+churn$pct_admitted = churn$stay_lt_30d / churn$N
+churn$pct_discharged = churn$discharge_lt_30d / churn$N
+churn$pct_dschrgdeath = churn$deceased_yn / churn$discharge_lt_30d
+
+```
+
+
+## Overview
+
+### Problem: 
+
+--
+
+We needed a way to track when a beneficiary was in a nursing home (NH)
+
+--
+
+### Possible Solutions:
+
+--
+
+ 1. A daily file with the membership-status (i.e., whether a beneficiary was in the NH or in the community) over the course of the year
+
+--
+
+ 2. A monthly file with the membership-status over the course of the year
+
+--
+
+ 3. A finder file with info on if a beneficiary was in a NH at any point during the year
+
+--
+
+ 4. The NF Stays file (which Albert will cover in more detail)
+ 
+ 
+ 
+---
+class: inverse center middle
+
+# Option 1. The NH Daily File
+
+
+---
+layout: true
+
+## 2020 NH Daily File
+
+---
+
+### Characteristics
+
+--
+
+ - Includes all bene's that were in a NH at any point in 2020*
+
+--
+
+ - Includes 366 days for each beneficiary (2020 was a leap year)
+
+--
+
+ - Has between 1 and 2 billion rows
+
+--
+
+ - Based on MDS 3.0 data; not based on claims data
+
+--
+
+ - Only non-MDS field is the `deceased` field
+
+
+---
+
+### Fields
+
+```{r, echo=FALSE}
+
+kable(fields, format = 'html') %>%
+  kable_styling(bootstrap_options = c("condensed", "striped"), 
+                full_width = FALSE, font_size = 12)
+
+```
+
+---
+
+### Record Layout
+```{r, echo=FALSE}
+
+kable(records, format = 'html') %>%
+  kable_styling(bootstrap_options = c("condensed", "striped"), 
+                full_width = FALSE, font_size = 12) %>%
+  scroll_box(height = "65%")
+
+```
+
+---
+layout: true
+
+## Examples 
+
+---
+
+### % of NH Residents Discharged & Expired in the Same Month
+
+```{r, echo = FALSE}
+
+churn %>%
+  ggplot(aes(x = sas_month, y = pct_dschrgdeath)) +
+  geom_line(stat = "identity", size = 1.5, color = "#23395b") +
+  geom_point(stat = "identity", shape = 21, color = "#23395b", fill = "white", size = 3) +
+  scale_y_continuous(labels = scales::label_percent(1L), limits = c(0, .5)) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %y") +
+  theme_minimal() +
+  xaringanthemer::theme_xaringan(text_font_size = 12) + 
+  theme(panel.grid.minor.x = element_blank(),
+        axis.title = element_blank())
+
+
+```
+
+
+
+---
+
+### Point-in-time checks
+
+--
+
+ - Compare to other sources (e.g., [The MDS 3.0 Frequency Report](https://www.cms.gov/Research-Statistics-Data-and-Systems/Computer-Data-and-Systems/Minimum-Data-Set-3-0-Public-Reports/Minimum-Data-Set-3-0-Frequency-Report)) by choosing a point-in-time
+
+--
+
+```{sql, eval = FALSE}
+proc sql; 
+  CREATE TABLE  eoy_base AS
+  SELECT        *
+  FROM          daily_file_name
+  WHERE         sasdt = "31DEC2020"d    #<<
+                AND in_nh_today = "Y";
+quit;
+```
+
+---
+
+### Point-in-time checks
+
+ - Compare to other sources (e.g., [The MDS 3.0 Frequency Report](https://www.cms.gov/Research-Statistics-Data-and-Systems/Computer-Data-and-Systems/Minimum-Data-Set-3-0-Public-Reports/Minimum-Data-Set-3-0-Frequency-Report)) by choosing a point-in-time
+
+```{sql, eval = FALSE}
+proc sql; 
+  CREATE TABLE  eom_base AS
+  SELECT        *
+  FROM          daily_file_name
+  WHERE         in_nh_today = "Y"
+  GROUP BY      bene_id, sas_month     #<<
+  HAVING        sasdt = max(sasdt);    #<<
+quit;
+```
+
+
+---
+
+### Drawbacks
+
+--
+
+ - The file is...pretty big
+ 
+--
+
+ - Some of the error from the MDS assessments will carry forward
+ 
+--
+ 
+ - There would need to be separate files for separate years
+
+--
+
+ - Although it has been QA'd, formal tests have not be run on it (yet)
+
+
+---
+layout: false
+
+
+
+## Outstanding Methodological Questions
+
+--
+
+ - Which variables should be included? 
+  - Should it be pure MDS?
+  
+--
+  
+ - Do we want to retain the 150 & 30 day rules?
+ 
+--
+
+ - When `deceased = "P"`, either:
+  - Remove the rows
+  - Select fields that should be blank
+
+--
+
+ - Odds and ends:
+  - Finalize variable names
+  - SAS formats
+
+  
+
+
+---
+
+## Future Directions
+
+--
+
+ - Figure out the use-cases
+
+--
+
+ - Create yearly files for past years (e.g., 2018 NH Daily File, 2019 NH Daily file)
+ 
+--
+ 
+ - Create a monthly file for the current year
+ 
+--
+ 
+ - Make script portable for derivation in the CCW
+ 
+--
+ 
+ - Create tests & documentation
+
+
+---
+class: center, middle
+
+## Any Questions?
+
+
+
+Slides created via the R packages:
+[**xaringan**](https://github.com/yihui/xaringan)<br>
+[gadenbuie/xaringanthemer](https://github.com/gadenbuie/xaringanthemer)
+
+*Note: Need to find a slide? Hit "o" on your keyboard*
+
+
